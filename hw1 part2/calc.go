@@ -64,15 +64,13 @@ func prepareExpression(symbols []string) []string {
 					stack.Pop()
 				}
 				stack.Pop()
-			} else if isOpenBrace(sym) {
+			} else if isOpenBrace(sym) || stack.isEmpty() {
 				stack.Push(sym)
 			} else {
-				if !stack.isEmpty() {
-					top := stack.Top()
-					if !isOpenBrace(top) && priority(top) > priority(sym) {
-						output = append(output, top)
-						stack.Pop()
-					}
+				top := stack.Top()
+				if !isOpenBrace(top) && priority(top) > priority(sym) {
+					output = append(output, top)
+					stack.Pop()
 				}
 
 				stack.Push(sym)
@@ -113,6 +111,8 @@ func priority(str string) (priority int) {
 		fallthrough
 	case "/":
 		priority = 2
+	default:
+		priority = 0
 	}
 
 	return
