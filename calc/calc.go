@@ -8,25 +8,39 @@ import (
 )
 
 func main() {
-	defer handleError()
+	defer func() {
+		if perr := recover(); perr != nil {
+			fmt.Printf("Error: %s\n", perr)
+			os.Exit(1)
+		}
+	}()
 
-	input := readInput()
-	regExp := createRegExp()
+	in := readInput()
 
-	symbols := extractSymbols(input, regExp)
+	out, err := calculate(in)
+	if err != nil {
+		panic(err)
+	}
 
-	exp := prepareExpression(symbols)
-	result := evaluateExpression(exp)
-
-	fmt.Println(result)
+	fmt.Println(out)
 }
 
 // Function declarations
-func handleError() {
-	err := recover()
-	if err != nil {
-		fmt.Printf("Error: %s\n", err)
-	}
+func calculate(in string) (out int, err error) {
+	defer func() {
+		if perr := recover(); perr != nil {
+			err = fmt.Errorf("%s", perr)
+		}
+	}()
+
+	regExp := createRegExp()
+	symbols := extractSymbols(in, regExp)
+	checkBraces(symbols)
+
+	exp := prepareExpression(symbols)
+	out = evaluateExpression(exp)
+
+	return
 }
 
 func readInput() string {
@@ -48,9 +62,24 @@ func extractSymbols(source string, regExp *regexp.Regexp) []string {
 	return regExp.FindAllString(source, -1)
 }
 
+func checkBraces(symbols []string) {
+	bracketLevel := 0
+	for _, sym := range symbols {
+		if isOpenBrace(sym) {
+			bracketLevel++
+		} else if isCloseBrace(sym) {
+			bracketLevel--
+		}
+	}
+
+	if bracketLevel != 0 {
+		panic("invalid braces")
+	}
+}
+
 func prepareExpression(symbols []string) []string {
 	output := make([]string, 0, len(symbols))
-	stack := createStack(len(symbols))
+	stack := NewStringStack(len(symbols))
 
 	isNumber := createIsNumberFunc()
 
@@ -64,11 +93,11 @@ func prepareExpression(symbols []string) []string {
 					stack.Pop()
 				}
 				stack.Pop()
-			} else if isOpenBrace(sym) || stack.isEmpty() {
+			} else if isOpenBrace(sym) || stack.IsEmpty() {
 				stack.Push(sym)
 			} else {
 				top := stack.Top()
-				if !isOpenBrace(top) && priority(top) > priority(sym) {
+				if !isOpenBrace(top) && priority(top) >= priority(sym) {
 					output = append(output, top)
 					stack.Pop()
 				}
@@ -77,7 +106,7 @@ func prepareExpression(symbols []string) []string {
 			}
 		}
 	}
-	for !stack.isEmpty() {
+	for !stack.IsEmpty() {
 		output = append(output, stack.Top())
 		stack.Pop()
 	}
@@ -119,15 +148,12 @@ func priority(str string) (priority int) {
 }
 
 func evaluateExpression(exp []string) int {
-	stack := createIntStack(len(exp))
+	stack := NewIntStack(len(exp))
 	isNumber := createIsNumberFunc()
 
 	for _, sym := range exp {
 		if isNumber(sym) {
-			num, err := strconv.Atoi(sym)
-			if err != nil {
-				panic(err)
-			}
+			num, _ := strconv.Atoi(sym)
 
 			stack.Push(num)
 		} else {
@@ -156,72 +182,4 @@ func evaluate(l, r int, op string) (res int) {
 	}
 
 	return
-}
-
-// Stack class
-type Stack struct {
-	buffer []string
-}
-
-func (this *Stack) isEmpty() bool {
-	return len(this.buffer) == 0
-}
-
-func (this *Stack) Push(value string) {
-	this.buffer = append(this.buffer, value)
-}
-
-func (this *Stack) Top() string {
-	return this.buffer[len(this.buffer)-1]
-}
-
-func (this *Stack) Pop() bool {
-	size := len(this.buffer)
-
-	if size > 0 {
-		this.buffer = this.buffer[:size-1]
-		return true
-	}
-
-	return false
-}
-
-func createStack(size int) Stack {
-	return Stack{
-		buffer: make([]string, 0, size),
-	}
-}
-
-// IntStack class
-type IntStack struct {
-	buffer []int
-}
-
-func (this *IntStack) isEmpty() bool {
-	return len(this.buffer) == 0
-}
-
-func (this *IntStack) Push(value int) {
-	this.buffer = append(this.buffer, value)
-}
-
-func (this *IntStack) Top() int {
-	return this.buffer[len(this.buffer)-1]
-}
-
-func (this *IntStack) Pop() bool {
-	size := len(this.buffer)
-
-	if size > 0 {
-		this.buffer = this.buffer[:size-1]
-		return true
-	}
-
-	return false
-}
-
-func createIntStack(size int) IntStack {
-	return IntStack{
-		buffer: make([]int, 0, size),
-	}
 }
