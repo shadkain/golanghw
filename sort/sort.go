@@ -16,22 +16,29 @@ type FlagSet struct {
 }
 
 func main() {
-	defer func() {
-		if perr := recover(); perr != nil {
-			fmt.Printf("Error: %s\n", perr)
-			os.Exit(1)
-		}
-	}()
+	flags := &FlagSet{}
+	filename := ""
 
-	flags, filename := parseCommandLine()
+	err := parseCommandLine(flags, &filename)
+	if err != nil {
+		crash(err)
+	}
 
 	in := strings.Split(readFile(filename), "\n")
 	out, err := sort(in, flags)
 	if err != nil {
-		panic(err)
+		crash(err)
 	}
 
-	printResult(out, flags.output)
+	err = printResult(out, flags.output)
+	if err != nil {
+		crash(err)
+	}
+}
+
+func crash(err error) {
+	fmt.Printf("Error: %s\n", err)
+	os.Exit(1)
 }
 
 func sort(in []string, flags *FlagSet) (out []string, err error) {
@@ -52,7 +59,7 @@ func sort(in []string, flags *FlagSet) (out []string, err error) {
 	return
 }
 
-func parseCommandLine() (flags *FlagSet, filename string) {
+func parseCommandLine(flags *FlagSet, filename *string) (err error) {
 	flags = &FlagSet{}
 
 	flag.BoolVar(&flags.ignoreCase, "f", false, "ignore letter case")
@@ -64,17 +71,17 @@ func parseCommandLine() (flags *FlagSet, filename string) {
 
 	flag.Parse()
 
-	filename = getFilename()
+	*filename, err = getFilename()
 
 	return
 }
 
-func getFilename() string {
+func getFilename() (string, error) {
 	if flag.NArg() < 1 {
-		panic("input file is missing")
+		return "", fmt.Errorf("input file is missing")
 	}
 
-	return flag.Arg(0)
+	return flag.Arg(0), nil
 }
 
 func readFile(filename string) string {
@@ -144,7 +151,7 @@ func uniteStrings(s []string) string {
 	return res
 }
 
-func printResult(lines []string, outfile string) {
+func printResult(lines []string, outfile string) error {
 	var stream *os.File
 	if outfile == "" {
 		stream = os.Stdin
@@ -152,7 +159,7 @@ func printResult(lines []string, outfile string) {
 		var err error
 		stream, err = os.Create(outfile)
 		if err != nil {
-			panic(err)
+			return err
 		}
 
 		defer stream.Close()
@@ -160,6 +167,8 @@ func printResult(lines []string, outfile string) {
 
 	_, err := stream.WriteString(strings.Join(lines, "\n"))
 	if err != nil {
-		panic(err)
+		return err
 	}
+
+	return nil
 }
