@@ -8,21 +8,22 @@ import (
 )
 
 func main() {
-	defer func() {
-		if perr := recover(); perr != nil {
-			fmt.Printf("Error: %s\n", perr)
-			os.Exit(1)
-		}
-	}()
-
-	in := readInput()
+	in, err := readInput()
+	if err != nil {
+		crash(err)
+	}
 
 	out, err := calculate(in)
 	if err != nil {
-		panic(err)
+		crash(err)
 	}
 
 	fmt.Println(out)
+}
+
+func crash(err error) {
+	fmt.Printf("Error: %s\n", err)
+	os.Exit(1)
 }
 
 // Function declarations
@@ -43,15 +44,15 @@ func calculate(in string) (out int, err error) {
 	return
 }
 
-func readInput() string {
+func readInput() (string, error) {
 	args := os.Args
 
 	nArgs := len(args)
 	if nArgs != 2 {
-		panic(fmt.Sprintf("expected 1 argument, but provided %d", nArgs-1))
+		return "", fmt.Errorf("expected 1 argument, but provided %d", nArgs-1)
 	}
 
-	return args[1]
+	return args[1], nil
 }
 
 func createRegExp() *regexp.Regexp {
