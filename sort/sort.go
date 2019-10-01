@@ -10,9 +10,9 @@ import (
 )
 
 type FlagSet struct {
-	f, u, r, n bool
-	o          string
-	k          int
+	ignoreCase, unique, reverse, numbers bool
+	output                               string
+	column                               int
 }
 
 func main() {
@@ -25,29 +25,29 @@ func main() {
 
 	flags, filename := parseCommandLine()
 
-	in := readFile(filename)
+	in := strings.Split(readFile(filename), "\n")
 	out, err := sort(in, flags)
 	if err != nil {
 		panic(err)
 	}
 
-	printResult(out, flags.o)
+	printResult(out, flags.output)
 }
 
-func sort(in string, flags *FlagSet) (out string, err error) {
+func sort(in []string, flags *FlagSet) (out []string, err error) {
 	defer func() {
 		if perr := recover(); perr != nil {
 			err = fmt.Errorf("%s", perr)
 		}
 	}()
 
-	lines := strings.Split(in, "\n")
+	lines := in
 	cmp := buildComparator(flags)
 	doSort(lines, cmp)
-	if flags.u == true {
+	if flags.unique == true {
 		lines = unique(lines, cmp)
 	}
-	out = uniteStrings(lines)
+	out = lines
 
 	return
 }
@@ -55,12 +55,12 @@ func sort(in string, flags *FlagSet) (out string, err error) {
 func parseCommandLine() (flags *FlagSet, filename string) {
 	flags = &FlagSet{}
 
-	flag.BoolVar(&flags.f, "f", false, "ignore letter case")
-	flag.BoolVar(&flags.u, "u", false, "print only the first among several equal")
-	flag.BoolVar(&flags.r, "r", false, "decrease order sort")
-	flag.StringVar(&flags.o, "o", "", "output to a file, without this option output to stdout")
-	flag.BoolVar(&flags.n, "n", false, "sort numbers")
-	flag.IntVar(&flags.k, "k", -1, "sort by column (column separator is a space)")
+	flag.BoolVar(&flags.ignoreCase, "f", false, "ignore letter case")
+	flag.BoolVar(&flags.unique, "u", false, "print only the first among several equal")
+	flag.BoolVar(&flags.reverse, "r", false, "decrease order sort")
+	flag.StringVar(&flags.output, "o", "", "output to a file, without this option output to stdout")
+	flag.BoolVar(&flags.numbers, "n", false, "sort numbers")
+	flag.IntVar(&flags.column, "k", -1, "sort by column (column separator is a space)")
 
 	flag.Parse()
 
@@ -90,21 +90,21 @@ func buildComparator(flags *FlagSet) *Comparator {
 	var base = &BaseNode{}
 
 	var cmp = &Comparator{
-		reverse: flags.r,
+		reverse: flags.reverse,
 		head:    base,
 		tail:    base,
 	}
 
-	if flags.k > -1 {
+	if flags.column > -1 {
 		cmp.ApplyNode(&ColumnNode{
-			k:   flags.k,
+			k:   flags.column,
 			sep: " ",
 		})
 	}
 
-	if flags.n == true {
+	if flags.numbers == true {
 		cmp.ApplyNode(&NumberNode{})
-	} else if flags.f == true {
+	} else if flags.ignoreCase == true {
 		cmp.ApplyNode(&IgnoreCaseNode{})
 	}
 
@@ -144,12 +144,10 @@ func uniteStrings(s []string) string {
 	return res
 }
 
-func printResult(str string, outfile string) {
+func printResult(lines []string, outfile string) {
 	var stream *os.File
-	var lastSym = ""
 	if outfile == "" {
 		stream = os.Stdin
-		lastSym = "\n"
 	} else {
 		var err error
 		stream, err = os.Create(outfile)
@@ -160,7 +158,7 @@ func printResult(str string, outfile string) {
 		defer stream.Close()
 	}
 
-	_, err := stream.WriteString(str + lastSym)
+	_, err := stream.WriteString(strings.Join(lines, "\n"))
 	if err != nil {
 		panic(err)
 	}
